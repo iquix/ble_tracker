@@ -86,7 +86,6 @@ def setup_scanner(hass, config, see, discovery_info=None):
 
     def perform_bluetooth_update(data):
         """Discover Bluetooth devices and update status."""
-        _LOGGER.debug("Performing Bluetooth devices discovery and update ")
         tasks = []
 
         device_name = None
@@ -132,25 +131,25 @@ def setup_scanner(hass, config, see, discovery_info=None):
                 event_loop = asyncio.get_event_loop()
                 event_loop.close()
             except:
-                _LOGGER.debug('no event loop to close')
+                #_LOGGER.debug('no event loop to close')
 
             event_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(event_loop)
             fac=event_loop._create_connection_transport(mysocket,aiobs.BLEScanRequester,None,None)
-            _LOGGER.debug('event loop connection') 
+            #_LOGGER.debug('event loop connection') 
             conn,btctrl = event_loop.run_until_complete(fac)
-            _LOGGER.debug('event loop connected') 
+            #_LOGGER.debug('event loop connected') 
             
             btctrl.process=perform_bluetooth_update
             btctrl.send_scan_request()
-            _LOGGER.debug('event loop starting') 
+            #_LOGGER.debug('event loop starting') 
 
             try:
                 event_loop.run_forever()
             except:
-                _LOGGER.warn('exception in ble tracker custom component')
+                _LOGGER.debug('exception in ble tracker custom component')
             finally:
-                _LOGGER.warn('closing event loop')
+                _LOGGER.debug('closing event loop')
                 btctrl.stop_scan_request()
                 command = aiobs.HCI_Cmd_LE_Advertise(enable=False)
                 btctrl.send_command(command)
@@ -159,7 +158,7 @@ def setup_scanner(hass, config, see, discovery_info=None):
         return True
 
     if not devices_to_track and not track_new:
-        _LOGGER.warn("No Bluetooth LE devices to track and not tracking new devices")
+        _LOGGER.debug("No Bluetooth LE devices to track and not tracking new devices")
     else:
         th = threading.Thread(target=start_thread, name='start_thread')
         th.start()
