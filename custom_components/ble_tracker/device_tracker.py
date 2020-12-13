@@ -25,10 +25,14 @@ _LOGGER = logging.getLogger(__name__)
 BLE_PREFIX = "BLE_"
 
 CONF_DEVICE_ID = "device_id"
+CONF_REQUEST_RSSI = "request_rssi"
 DEFAULT_DEVICE_ID = 0
+DEFAULT_REQUEST_RSSI = False
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
+        vol.Optional(CONF_TRACK_NEW): cv.boolean,
+        vol.Optional(CONF_REQUEST_RSSI, default=DEFAULT_REQUEST_RSSI): cv.boolean,
         vol.Optional(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): vol.All(
             vol.Coerce(int), vol.Range(min=0)
         ),
@@ -78,16 +82,14 @@ def get_tracking_devices(hass: HomeAssistantType) -> Tuple[Set[str], Set[str]]:
 def setup_scanner(hass, config, see, discovery_info=None):
     """Set up the Bluetooth LE Scanner."""
     device_id: int = config[CONF_DEVICE_ID]
+    request_rssi: bool = config.get(CONF_REQUEST_RSSI)
     # If track new devices is true discover new devices on startup.
     track_new: bool = config.get(CONF_TRACK_NEW, DEFAULT_TRACK_NEW)
-    _LOGGER.debug("Tracking new devices is set to %s", track_new)
 
     devices_to_track, devices_to_not_track = get_tracking_devices(hass)
 
     def perform_bluetooth_update(data):
         """Discover Bluetooth devices and update status."""
-        tasks = []
-
         device_name = None
         p = parse_hci(data)
         if p["mac"] == None:
@@ -113,10 +115,11 @@ def setup_scanner(hass, config, see, discovery_info=None):
             for x in mac:
                 ret["mac"] = x.val.upper()
                 break
-            rssi= ev.retrieve("rssi")
-            for x in rssi:
-                ret["rssi"] = x.val
-                break
+            if request_rssi:
+                rssi= ev.retrieve("rssi")
+                for x in rssi:
+                    ret["rssi"] = x.val
+                    break
         except:
             pass
         return ret
