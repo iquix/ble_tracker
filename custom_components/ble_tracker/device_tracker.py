@@ -131,6 +131,7 @@ def setup_scanner(hass, config, see, discovery_info=None):
                 event_loop = asyncio.get_event_loop()
                 event_loop.close()
             except:
+				pass
                 #_LOGGER.debug('no event loop to close')
 
             event_loop = asyncio.new_event_loop()
