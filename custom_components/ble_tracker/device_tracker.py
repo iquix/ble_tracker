@@ -31,7 +31,6 @@ DEFAULT_DEVICE_ID = 0
 DEFAULT_REQUEST_RSSI = False
 
 IBC_PACKET_HEADER = b"\x1a\xff\x4c\x00\x02\x15"
-IBC_PACKET_HEADER_POS = 14
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -121,8 +120,8 @@ async def async_setup_scanner(hass, config, async_see, discovery_info=None):
             eds = EddyStone().decode(ev)
             if ret["mac"] == None and eds and eds.get('name space')!=None:
                 ret["mac"] = "EDS_" + eds.get('name space').hex().upper()
-            elif data.find(IBC_PACKET_HEADER)==IBC_PACKET_HEADER_POS:
-                startpos = IBC_PACKET_HEADER_POS + len(IBC_PACKET_HEADER)
+            elif IBC_PACKET_HEADER in data:
+                startpos = data.find(IBC_PACKET_HEADER) + len(IBC_PACKET_HEADER)
                 ret["mac"] = "IBC_" + data[startpos:startpos+18].hex().upper()
             else:
                 mac = ev.retrieve("peer")
