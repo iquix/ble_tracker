@@ -4,6 +4,7 @@ import logging
 import threading
 import aioblescan as aiobs
 import voluptuous as vol
+from aioblescan.plugins import EddyStone
 from typing import Optional, Set, Tuple
 
 from homeassistant.components.device_tracker import PLATFORM_SCHEMA
@@ -29,6 +30,9 @@ CONF_REQUEST_RSSI = "request_rssi"
 DEFAULT_DEVICE_ID = 0
 DEFAULT_REQUEST_RSSI = False
 
+IBC_PACKET_HEADER = b"\x1a\xff\x4c\x00\x02\x15"
+IBC_PACKET_HEADER_POS = 14
+
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Optional(CONF_TRACK_NEW): cv.boolean,
@@ -40,24 +44,25 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-def is_bluetooth_device(device):
-    """Check whether a device is a bluetooth device by its mac."""
+def is_ble_device(device):
+    """Check whether a device is a BLE device by its mac."""
     return device.mac and device.mac[:len(BLE_PREFIX)].upper() == BLE_PREFIX
 
 
-def see_device(hass, see, mac, device_name, rssi=None):
+async def see_device(hass, async_see, mac, device_name, rssi=None):
     """Mark a device as seen."""
     attributes = {}
     if rssi is not None:
         attributes["rssi"] = rssi
-    see(
+    await async_see(
         mac=BLE_PREFIX+mac,
         host_name=device_name,
         attributes=attributes,
         source_type=SOURCE_TYPE_BLUETOOTH_LE,
     )
 
-def get_tracking_devices(hass: HomeAssistantType) -> Tuple[Set[str], Set[str]]:
+
+async def get_tracking_devices(hass: HomeAssistantType) -> Tuple[Set[str], Set[str]]:
     """
     Load all known devices.
 
@@ -65,10 +70,8 @@ def get_tracking_devices(hass: HomeAssistantType) -> Tuple[Set[str], Set[str]]:
     """
     yaml_path: str = hass.config.path(YAML_DEVICES)
 
-    devices = asyncio.run_coroutine_threadsafe(
-        async_load_config(yaml_path, hass, 0), hass.loop
-    ).result()
-    bluetooth_devices = [device for device in devices if is_bluetooth_device(device)]
+    devices = await async_load_config(yaml_path, hass, 0)
+    bluetooth_devices = [device for device in devices if is_ble_device(device)]
 
     devices_to_track: Set[str] = {
         device.mac[len(BLE_PREFIX):] for device in bluetooth_devices if device.track
@@ -79,14 +82,18 @@ def get_tracking_devices(hass: HomeAssistantType) -> Tuple[Set[str], Set[str]]:
     return devices_to_track, devices_to_not_track
 
 
-def setup_scanner(hass, config, see, discovery_info=None):
+async def async_setup_scanner(hass, config, async_see, discovery_info=None):
     """Set up the Bluetooth LE Scanner."""
     device_id: int = config[CONF_DEVICE_ID]
     request_rssi: bool = config.get(CONF_REQUEST_RSSI)
     # If track new devices is true discover new devices on startup.
     track_new: bool = config.get(CONF_TRACK_NEW, DEFAULT_TRACK_NEW)
 
-    devices_to_track, devices_to_not_track = get_tracking_devices(hass)
+    devices_to_track, devices_to_not_track = await get_tracking_devices(hass)
+
+    #_LOGGER.debug("device to track {}".format(devices_to_track))
+    #_LOGGER.debug("device to not track {}".format(devices_to_not_track))
+
 
     def perform_bluetooth_update(data):
         """Discover Bluetooth devices and update status."""
@@ -101,7 +108,7 @@ def setup_scanner(hass, config, see, discovery_info=None):
 
         if p["mac"] in devices_to_track:
             device_name = BLE_PREFIX + p["mac"].replace(":","")
-            see_device(hass, see, p["mac"], device_name, p["rssi"])
+            asyncio.ensure_future(see_device(hass, async_see, p["mac"], device_name, p["rssi"]))
 
 
     def parse_hci(data):
@@ -109,20 +116,28 @@ def setup_scanner(hass, config, see, discovery_info=None):
         ret["mac"]=None
         ret["rssi"]=None
         try:
-            ev=aiobs.HCI_Event()
+            ev = aiobs.HCI_Event()
             ev.decode(data)
-            mac= ev.retrieve("peer")
-            for x in mac:
-                ret["mac"] = x.val.upper()
-                break
+            eds = EddyStone().decode(ev)
+            if ret["mac"] == None and eds and eds.get('name space')!=None:
+                ret["mac"] = "EDS_" + eds.get('name space').hex().upper()
+            elif data.find(IBC_PACKET_HEADER)==IBC_PACKET_HEADER_POS:
+                startpos = IBC_PACKET_HEADER_POS + len(IBC_PACKET_HEADER)
+                ret["mac"] = "IBC_" + data[startpos:startpos+18].hex().upper()
+            else:
+                mac = ev.retrieve("peer")
+                for x in mac:
+                    ret["mac"] = x.val.upper()
+                    break
             if request_rssi:
-                rssi= ev.retrieve("rssi")
+                rssi = ev.retrieve("rssi")
                 for x in rssi:
                     ret["rssi"] = x.val
                     break
-        except:
+        except Exception as ex:
             pass
         return ret
+
 
     def start_thread():
         try:
