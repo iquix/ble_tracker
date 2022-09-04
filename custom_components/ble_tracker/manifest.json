@@ -3,7 +3,7 @@
   "name": "aioblescan BLE tracker",
   "documentation": "https://github.com/iquix/ble_tracker",
   "requirements": ["aioblescan==0.2.4"],
-  "dependencies": [],
+  "dependencies": ["device_tracker"],
   "codeowners": [
     "@iquix"
   ],
