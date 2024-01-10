@@ -7,11 +7,13 @@ import voluptuous as vol
 from aioblescan.plugins import EddyStone
 from typing import Optional, Set, Tuple
 
-from homeassistant.components.device_tracker import PLATFORM_SCHEMA
+from homeassistant.components.device_tracker import (
+    PLATFORM_SCHEMA,
+    SourceType,
+)
 from homeassistant.components.device_tracker.const import (
     CONF_TRACK_NEW,
     DEFAULT_TRACK_NEW,
-    SOURCE_TYPE_BLUETOOTH_LE,
 )
 from homeassistant.components.device_tracker.legacy import (
     YAML_DEVICES,
@@ -57,7 +59,7 @@ async def see_device(hass, async_see, mac, device_name, rssi=None):
         mac=BLE_PREFIX+mac,
         host_name=device_name,
         attributes=attributes,
-        source_type=SOURCE_TYPE_BLUETOOTH_LE,
+        source_type=SourceType.BLUETOOTH_LE,
     )
 
 
