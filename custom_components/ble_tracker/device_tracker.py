@@ -21,7 +21,7 @@ from homeassistant.components.device_tracker.legacy import (
 )
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ async def see_device(hass, async_see, mac, device_name, rssi=None):
     )
 
 
-async def get_tracking_devices(hass: HomeAssistantType) -> Tuple[Set[str], Set[str]]:
+async def get_tracking_devices(hass: HomeAssistant) -> Tuple[Set[str], Set[str]]:
     """
     Load all known devices.
 
